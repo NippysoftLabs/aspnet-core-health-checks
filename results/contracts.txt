@@ -1,0 +1,21 @@
+# ProbeLab contracts on .NET 10.0.12
+K1 three checks of 500 ms each -> Healthy in 0.5 s | a=Healthy description="" exception=-; b=Healthy description="" exception=-; c=Healthy description="" exception=-
+K2 timeout 300 ms, check blocks 1500 ms and ignores the token -> Healthy in 1.5 s | blocking=Healthy description="" exception=-
+K3 timeout 300 ms, check waits 5000 ms with the token -> Unhealthy in 0.3 s | waiting=Unhealthy description="A timeout occurred while running check." exception=TaskCanceledException
+K4 failureStatus Degraded, check throws -> Degraded in 0.0 s | throws=Degraded description="dependency said no" exception=InvalidOperationException
+K5 failureStatus Degraded, check returns Unhealthy explicitly -> Unhealthy in 0.0 s | explicit=Unhealthy description="explicit result" exception=-
+K6a Healthy + Degraded -> Degraded in 0.0 s | h=Healthy description="" exception=-; d=Degraded description="" exception=-
+K6b Degraded + Unhealthy -> Unhealthy in 0.0 s | d=Degraded description="" exception=-; u=Unhealthy description="" exception=-
+K6c no checks registered -> Healthy in 0.0 s 
+K7 DbContext check, failureStatus Degraded, database file missing -> Degraded in 0.3 s | database=Degraded description="" exception=-
+K7 file created by the check: False
+K8 DbContext check, failureStatus Degraded, test query throws -> Unhealthy in 0.0 s | database=Unhealthy description="SQLite Error 1: 'no such table: MissingTable'." exception=SqliteException
+K9 DbContext check, failureStatus Degraded, timeout 300 ms, test query waits 5000 ms -> Unhealthy in 0.3 s | database=Unhealthy description="A task was canceled." exception=TaskCanceledException
+K10 -> ArgumentException: Duplicate health checks were registered with the name(s): DB (Parameter 'registrations')
+K11 ResultStatusCodes without Degraded -> InvalidOperationException: The ResultStatusCodes dictionary must include an entry for all possible HealthStatus values. Missing: HealthStatus.Degraded
+K12 /by-host on 5392 -> 404
+K12 /by-host on 5392 with Host: localhost:5393 -> 200
+K12 /by-host on 5393 -> 200
+K12 /by-port on 5392 -> 404
+K12 /by-port on 5392 with Host: localhost:5393 -> 404
+K12 /by-port on 5393 -> 200

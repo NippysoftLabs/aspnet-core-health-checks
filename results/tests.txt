@@ -1,0 +1,4 @@
+total: 9
+failed: 0
+succeeded: 9
+skipped: 0
