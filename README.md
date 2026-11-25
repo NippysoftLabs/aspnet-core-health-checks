@@ -23,6 +23,9 @@ A small orders service that uses the built-in health checks
   `Kestrel:Endpoints` section of `appsettings.json` replaces `Urls`, `ASPNETCORE_URLS` and
   `ASPNETCORE_HTTP_PORTS`; to change a port, set `Kestrel__Endpoints__Public__Url` or
   `Kestrel__Endpoints__Management__Url` (`results/bindings.txt`; `results/live.txt`, P17).
+  To move the management port, change `Kestrel__Endpoints__Management__Url` and `Management__Port`
+  together: the first one decides where Kestrel listens, the second one which local port
+  `/health/details` answers on. With only the URL changed, `/health/details` answers 404.
 - **The startup probe has its own route.** `/health/startup` runs only the `startup` check, so the
   probe waits for the warm-up (P1). If the warm-up hangs, the startup probe keeps failing and Kubernetes
   restarts the container.
