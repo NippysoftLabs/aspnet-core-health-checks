@@ -7,8 +7,7 @@ P1 t=2.0 s live -> 200 Healthy; startup -> 503 Unhealthy; ready -> 503 Unhealthy
 P1 t=2.5 s live -> 200 Healthy; startup -> 503 Unhealthy; ready -> 503 Unhealthy
 P1 t=3.0 s live -> 200 Healthy; startup -> 503 Unhealthy; ready -> 503 Unhealthy
 P1 t=3.5 s live -> 200 Healthy; startup -> 503 Unhealthy; ready -> 503 Unhealthy
-P1 t=4.0 s live -> 200 Healthy; startup -> 503 Unhealthy; ready -> 503 Unhealthy
-P1 t=4.5 s live -> 200 Healthy; startup -> 200 Healthy; ready -> 200 Healthy
+P1 t=4.0 s live -> 200 Healthy; startup -> 200 Healthy; ready -> 200 Healthy
 ## P17 bindings: public port on every interface, management port on localhost only
 P17 Now listening on: http://localhost:5391
 P17 Now listening on: http://[::]:5390

@@ -47,7 +47,7 @@ public static class LiveRuns
         }))
         {
             await app.WaitForListeningAsync(Client);
-            await Task.Delay(500);
+            await WaitUntilWarmAsync();
             await FloodAsync(stub, "P13");
             await StaleCacheAsync(stub);
             await CacheWhileHangingAsync(stub);
@@ -63,9 +63,26 @@ public static class LiveRuns
         }))
         {
             await app.WaitForListeningAsync(Client);
-            await Task.Delay(500);
+            await WaitUntilWarmAsync();
             await KubeletAgainstHangAsync(stub, "P15");
         }
+    }
+
+    // Runs B and C start measuring only after the warm-up: until then readiness answers 503 (P1).
+    // It polls /health/startup, which runs only the startup check, so payments-api is not called and its cache stays empty.
+    private static async Task WaitUntilWarmAsync()
+    {
+        for (int i = 0; i < 200; i++)
+        {
+            if ((await GetAsync(AppProcess.PublicUrl + "/health/startup")).Code == 200)
+            {
+                return;
+            }
+
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException("The warm-up did not finish.");
     }
 
     private static async Task StartupTimelineAsync(AppProcess app)
