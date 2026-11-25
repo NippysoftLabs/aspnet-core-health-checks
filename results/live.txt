@@ -1,13 +1,19 @@
 # ProbeLab live on .NET 10.0.12
 # Run A: CacheSeconds=0, CheckTimeoutMs=800, WarmUpSeconds=3
-## P1 startup: liveness and readiness while the warm-up runs
-P1 t=1.0 s live -> 200 Healthy; ready -> 503 Unhealthy
-P1 t=1.5 s live -> 200 Healthy; ready -> 503 Unhealthy
-P1 t=2.0 s live -> 200 Healthy; ready -> 503 Unhealthy
-P1 t=2.5 s live -> 200 Healthy; ready -> 503 Unhealthy
-P1 t=3.0 s live -> 200 Healthy; ready -> 503 Unhealthy
-P1 t=3.5 s live -> 200 Healthy; ready -> 503 Unhealthy
-P1 t=4.0 s live -> 200 Healthy; ready -> 200 Healthy
+## P1 startup: liveness, startup and readiness while the warm-up runs
+P1 t=1.0 s live -> 200 Healthy; startup -> 503 Unhealthy; ready -> 503 Unhealthy
+P1 t=1.5 s live -> 200 Healthy; startup -> 503 Unhealthy; ready -> 503 Unhealthy
+P1 t=2.0 s live -> 200 Healthy; startup -> 503 Unhealthy; ready -> 503 Unhealthy
+P1 t=2.5 s live -> 200 Healthy; startup -> 503 Unhealthy; ready -> 503 Unhealthy
+P1 t=3.0 s live -> 200 Healthy; startup -> 503 Unhealthy; ready -> 503 Unhealthy
+P1 t=3.5 s live -> 200 Healthy; startup -> 503 Unhealthy; ready -> 503 Unhealthy
+P1 t=4.0 s live -> 200 Healthy; startup -> 503 Unhealthy; ready -> 503 Unhealthy
+P1 t=4.5 s live -> 200 Healthy; startup -> 200 Healthy; ready -> 200 Healthy
+## P17 bindings: public port on every interface, management port on localhost only
+P17 Now listening on: http://localhost:5391
+P17 Now listening on: http://[::]:5390
+P17 public port 5390 on a non-loopback address of this machine -> 200
+P17 management port 5391 on a non-loopback address of this machine -> connection failed (ConnectionError)
 ## P2 payments stub mode=ok
 P2 ready -> 200 Healthy in 0.0 s
 P2 details -> 200 {"status":"Healthy","totalDurationMs":_,"checks":[{"name":"startup","status":"Healthy","durationMs":_,"description":"warm-up finished"},{"name":"database","status":"Healthy","durationMs":_,"description":null},{"name":"payments-api","status":"Healthy","durationMs":_,"description":"payments-api answered 200"}]}
@@ -62,6 +68,8 @@ P13 answers: 200 Healthy x200; calls that reached payments-api: 1
 P14 t=0.0 s stub=ok ready -> 200 Healthy
 P14 t=0.0 s stub=fail ready -> 200 Healthy
 P14 t=10.5 s stub=fail ready -> 200 Degraded
+## P16 CacheSeconds=10 while payments hangs: 10 requests, one per second
+P16 answers: 200 Degraded x10; calls that reached payments-api: 10
 
 # Run C: CacheSeconds=0, CheckTimeoutMs=2000, WarmUpSeconds=0
 ## P15 kubelet rules (timeoutSeconds=1, failureThreshold=3) while payments hangs

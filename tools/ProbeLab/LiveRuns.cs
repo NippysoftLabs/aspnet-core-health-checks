@@ -1,4 +1,7 @@
 using System.Diagnostics;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 
 namespace ProbeLab;
 
@@ -24,6 +27,7 @@ public static class LiveRuns
         {
             await app.WaitForListeningAsync(Client);
             await StartupTimelineAsync(app);
+            await BindingsAsync(app);
             await PaymentsStatesAsync(stub);
             await KubeletAgainstHangAsync(stub, "P5");
             await PortsAsync();
@@ -46,6 +50,7 @@ public static class LiveRuns
             await Task.Delay(500);
             await FloodAsync(stub, "P13");
             await StaleCacheAsync(stub);
+            await CacheWhileHangingAsync(stub);
         }
 
         Console.WriteLine();
@@ -65,12 +70,13 @@ public static class LiveRuns
 
     private static async Task StartupTimelineAsync(AppProcess app)
     {
-        Console.WriteLine("## P1 startup: liveness and readiness while the warm-up runs");
+        Console.WriteLine("## P1 startup: liveness, startup and readiness while the warm-up runs");
         for (int i = 0; i < 12; i++)
         {
             (int liveCode, string liveBody) = await GetAsync(AppProcess.PublicUrl + "/health/live");
+            (int startupCode, string startupBody) = await GetAsync(AppProcess.PublicUrl + "/health/startup");
             (int readyCode, string readyBody) = await GetAsync(AppProcess.PublicUrl + "/health/ready");
-            Console.WriteLine($"P1 t={Bucket(app.SinceStart.Elapsed)} live -> {liveCode} {liveBody}; ready -> {readyCode} {readyBody}");
+            Console.WriteLine($"P1 t={Bucket(app.SinceStart.Elapsed)} live -> {liveCode} {liveBody}; startup -> {startupCode} {startupBody}; ready -> {readyCode} {readyBody}");
             if (readyCode == 200)
             {
                 break;
@@ -102,6 +108,65 @@ public static class LiveRuns
         Console.WriteLine($"## {label} kubelet rules (timeoutSeconds=1, failureThreshold=3) while payments hangs");
         await KubeletSim.RunAsync(AppProcess.PublicUrl, new ProbeSpec("readiness", "/health/ready"), attempts: 4);
         await KubeletSim.RunAsync(AppProcess.PublicUrl, new ProbeSpec("liveness", "/health/live"), attempts: 2);
+        stub.Mode = "ok";
+    }
+
+    // P17: which addresses Kestrel bound, and whether each port answers on a non-loopback address of this machine.
+    // The address itself is not printed.
+    private static async Task BindingsAsync(AppProcess app)
+    {
+        Console.WriteLine("## P17 bindings: public port on every interface, management port on localhost only");
+        foreach (string line in app.ListeningOn)
+        {
+            Console.WriteLine($"P17 {line}");
+        }
+
+        IPAddress? lan = NetworkInterface.GetAllNetworkInterfaces()
+            .Where(n => n.OperationalStatus == OperationalStatus.Up && n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+            .SelectMany(n => n.GetIPProperties().UnicastAddresses)
+            .Select(a => a.Address)
+            .FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(a));
+        if (lan is null)
+        {
+            Console.WriteLine("P17 no non-loopback IPv4 address on this machine; skipped");
+            return;
+        }
+
+        foreach ((string label, int port, string path) in new[] { ("public", 5390, "/health/live"), ("management", 5391, "/health/details") })
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            string outcome;
+            try
+            {
+                using HttpResponseMessage response = await Client.GetAsync($"http://{lan}:{port}{path}", cts.Token);
+                outcome = ((int)response.StatusCode).ToString();
+            }
+            catch (HttpRequestException exception)
+            {
+                outcome = $"connection failed ({exception.HttpRequestError})";
+            }
+
+            Console.WriteLine($"P17 {label} port {port} on a non-loopback address of this machine -> {outcome}");
+        }
+    }
+
+    // P16: the cache does not keep a call cancelled by the timeout, so while payments hangs every probe calls it.
+    private static async Task CacheWhileHangingAsync(PaymentsStub stub)
+    {
+        stub.Mode = "hang";
+        await Task.Delay(TimeSpan.FromSeconds(10.5));
+        stub.ResetCounters();
+        Console.WriteLine("## P16 CacheSeconds=10 while payments hangs: 10 requests, one per second");
+        var answers = new List<string>();
+        for (int i = 0; i < 10; i++)
+        {
+            (int code, string body) = await GetAsync(AppProcess.PublicUrl + "/health/ready");
+            answers.Add($"{code} {body}");
+            await Task.Delay(1000);
+        }
+
+        string summary = string.Join(", ", answers.GroupBy(a => a).Select(g => $"{g.Key} x{g.Count()}"));
+        Console.WriteLine($"P16 answers: {summary}; calls that reached payments-api: {stub.Hits}");
         stub.Mode = "ok";
     }
 

@@ -13,6 +13,9 @@ public sealed class AppProcess : IAsyncDisposable
 
     public Stopwatch SinceStart { get; } = new();
 
+    // Kestrel "Now listening on" lines, in the order the app printed them.
+    public System.Collections.Concurrent.ConcurrentQueue<string> ListeningOn { get; } = new();
+
     private AppProcess(Process process, string dataDirectory)
     {
         _process = process;
@@ -30,10 +33,13 @@ public sealed class AppProcess : IAsyncDisposable
             UseShellExecute = false,
         };
         info.ArgumentList.Add(appDll);
-        info.Environment["Urls"] = $"{PublicUrl};{ManagementUrl}";
+        // Same shape as appsettings.json: public port on every interface, management port on localhost only.
+        info.Environment["Kestrel__Endpoints__Public__Url"] = "http://+:5390";
+        info.Environment["Kestrel__Endpoints__Management__Url"] = "http://localhost:5391";
         info.Environment["Management__Port"] = "5391";
         info.Environment["Orders__DatabasePath"] = Path.Combine(dataDirectory, "orders.db");
         info.Environment["Logging__LogLevel__Default"] = "Warning";
+        info.Environment["Logging__LogLevel__Microsoft.Hosting.Lifetime"] = "Information";
         foreach ((string key, string value) in settings)
         {
             info.Environment[key] = value;
@@ -41,7 +47,13 @@ public sealed class AppProcess : IAsyncDisposable
 
         var process = new Process { StartInfo = info };
         var app = new AppProcess(process, dataDirectory);
-        process.OutputDataReceived += (_, _) => { };
+        process.OutputDataReceived += (_, e) =>
+        {
+            if (e.Data is { } line && line.Contains("Now listening on:"))
+            {
+                app.ListeningOn.Enqueue(line.Trim());
+            }
+        };
         process.ErrorDataReceived += (_, _) => { };
         process.Start();
         app.SinceStart.Start();

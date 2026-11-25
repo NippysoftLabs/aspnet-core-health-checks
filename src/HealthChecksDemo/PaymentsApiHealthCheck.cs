@@ -4,6 +4,7 @@ namespace HealthChecksDemo;
 
 public sealed class PaymentsOptions
 {
+    // Program.cs adds the trailing slash when it is missing.
     public string BaseUrl { get; set; } = "http://localhost:5399/";
 
     // 0 turns the cache off: every probe calls the payments API.
@@ -13,7 +14,7 @@ public sealed class PaymentsOptions
     public int CheckTimeoutMs { get; set; } = 800;
 }
 
-// Calls GET {BaseUrl}status. 2xx -> Healthy; any other status or a connection error -> the registration's FailureStatus.
+// Calls GET {BaseUrl}status (BaseUrl ends with "/"). 2xx -> Healthy; any other status or a connection error -> the registration's FailureStatus.
 public sealed class PaymentsApiHealthCheck(IHttpClientFactory clients, PaymentsHealthCache cache) : IHealthCheck
 {
     public const string ClientName = "payments";

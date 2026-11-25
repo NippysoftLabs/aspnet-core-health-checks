@@ -1,4 +1,4 @@
-total: 9
+total: 13
 failed: 0
-succeeded: 9
+succeeded: 13
 skipped: 0

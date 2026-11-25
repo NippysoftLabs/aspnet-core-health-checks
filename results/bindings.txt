@@ -1,0 +1,12 @@
+# Kestrel:Endpoints from appsettings.json, ports moved with Kestrel__Endpoints__Public__Url=http://+:5480 and Kestrel__Endpoints__Management__Url=http://localhost:5481 (8080 is taken on this machine)
+## no other variables
+Now listening on: http://localhost:5481
+Now listening on: http://[::]:5480
+## plus ASPNETCORE_HTTP_PORTS=5482
+Overriding address(es) 'http://*:5482'. Binding to endpoints defined via IConfiguration and/or UseKestrel() instead.
+Now listening on: http://localhost:5481
+Now listening on: http://[::]:5480
+## plus ASPNETCORE_URLS=http://+:5483
+Overriding address(es) 'http://+:5483'. Binding to endpoints defined via IConfiguration and/or UseKestrel() instead.
+Now listening on: http://localhost:5481
+Now listening on: http://[::]:5480

@@ -8,6 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Port that serves the detailed JSON report. The middleware compares it with the local port
 // of the connection, not with the Host header, so a client cannot pick it by sending a header.
+// appsettings.json binds this port to localhost only; the public port listens on every interface.
 int managementPort = builder.Configuration.GetValue("Management:Port", 8081);
 
 string databasePath = Path.GetFullPath(
@@ -24,11 +25,13 @@ PaymentsOptions payments = builder.Configuration.GetSection("Payments").Get<Paym
 builder.Services.AddSingleton(payments);
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<PaymentsHealthCache>();
-builder.Services.AddHttpClient(PaymentsApiHealthCheck.ClientName, client => client.BaseAddress = new Uri(payments.BaseUrl));
+// A base address without a trailing slash would drop its last segment: ".../v1" + "status" -> ".../status".
+string paymentsBase = payments.BaseUrl.EndsWith('/') ? payments.BaseUrl : payments.BaseUrl + "/";
+builder.Services.AddHttpClient(PaymentsApiHealthCheck.ClientName, client => client.BaseAddress = new Uri(paymentsBase));
 
 builder.Services.AddHealthChecks()
-    // Fails until the warm-up work has finished.
-    .AddCheck<StartupHealthCheck>("startup", tags: ["ready"])
+    // Fails until the warm-up work has finished. Runs on /health/startup and /health/ready.
+    .AddCheck<StartupHealthCheck>("startup", tags: ["startup", "ready"])
     // EF Core check: calls Database.CanConnectAsync on OrdersDb.
     .AddDbContextCheck<OrdersDb>("database", tags: ["ready"])
     // A payments outage reports Degraded, not Unhealthy, so it does not take every instance
@@ -39,10 +42,22 @@ builder.Services.AddHealthChecks()
         tags: ["ready"],
         timeout: TimeSpan.FromMilliseconds(payments.CheckTimeoutMs));
 
+// AddDbContextCheck has no timeout parameter, so the registration's Timeout is set here.
+// On a timeout the EF Core check reports Unhealthy (results/contracts.txt, K9).
+int databaseTimeoutMs = builder.Configuration.GetValue("Orders:CheckTimeoutMs", 800);
+builder.Services.PostConfigure<HealthCheckServiceOptions>(options =>
+    options.Registrations.Single(r => r.Name == "database").Timeout = TimeSpan.FromMilliseconds(databaseTimeoutMs));
+
 var app = builder.Build();
 
 // Liveness: runs no checks. It answers 200 "Healthy" while the process can serve HTTP.
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
+
+// Startup: runs only the "startup" check. 503 until the warm-up has finished, then 200.
+app.MapHealthChecks("/health/startup", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("startup"),
+});
 
 // Readiness: runs the checks tagged "ready". Unhealthy -> 503; Healthy and Degraded -> 200 (defaults).
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
